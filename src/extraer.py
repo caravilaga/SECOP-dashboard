@@ -16,7 +16,7 @@ COLUMNAS = [
     "valor_del_contrato", "valor_pagado", "origen_de_los_recursos",
     "fecha_de_firma", "fecha_de_inicio_del_contrato", "fecha_de_fin_del_contrato",
     "objeto_del_contrato", "urlproceso",
-]
+    ]
 
 
 def construir_filtro(departamento: str, desde: date, hasta: date) -> str:
