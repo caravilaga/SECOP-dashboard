@@ -221,3 +221,6 @@ __marimo__/
 
 # Streamlit
 .streamlit/secrets.toml
+
+# Sitio generado (lo construye GitHub Actions en el Paso 7)
+site/
