@@ -238,3 +238,6 @@ def construir_pagina(directorio_gold: Path = DIR_GOLD, salida: Path = DIR_SITIO)
     archivo = salida / "index.html"
     archivo.write_text(html, encoding="utf-8")
     return archivo
+
+if __name__ == "__main__":
+    print("Página generada en:", construir_pagina())
