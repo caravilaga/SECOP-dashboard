@@ -1,0 +1,57 @@
+name: Publicar tablero
+
+on:
+  workflow_dispatch:            # botón manual "Run workflow"
+  push:
+    branches: [main]
+    paths:                      # solo cuando cambia algo que afecta la página
+      - "data/gold/**"
+      - "src/visualizar.py"
+      - "requirements.txt"
+
+permissions:
+  contents: read                # leer el repo
+  pages: write                  # publicar en Pages
+  id-token: write               # identificarse ante Pages de forma segura
+
+concurrency:                    # evita dos publicaciones al mismo tiempo
+  group: pages
+  cancel-in-progress: false
+
+jobs:
+  construir:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Descargar el repositorio
+        uses: actions/checkout@v5
+
+      - name: Instalar Python
+        uses: actions/setup-python@v6
+        with:
+          python-version: "3.12"
+          cache: pip
+
+      - name: Instalar dependencias
+        run: pip install -r requirements.txt
+
+      - name: Generar la página
+        run: python -m src.visualizar
+
+      - name: Configurar Pages
+        uses: actions/configure-pages@v5
+
+      - name: Empaquetar el sitio
+        uses: actions/upload-pages-artifact@v4
+        with:
+          path: site
+
+  publicar:
+    needs: construir            # espera a que termine "construir"
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deploy.outputs.page_url }}
+    steps:
+      - name: Publicar en GitHub Pages
+        id: deploy
+        uses: actions/deploy-pages@v4
