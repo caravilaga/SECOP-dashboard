@@ -1,0 +1,326 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Contratación pública en Colombia · SECOP II</title>
+<script src="https://cdn.plot.ly/plotly-4.1.1.min.js"></script>
+<style>
+  :root {
+    --fondo-pagina: #f9f9f7; --fondo: #fcfcfb; --tinta: #0b0b0b; --tinta-2: #52514e;
+    --tinta-tenue: #898781; --grilla: #e1e0d9; --borde: rgba(11,11,11,0.10);
+    --azul: #2a78d6; --azul-claro: #86b6ef; --sombreado: #f0efec;
+    --fuente: system-ui, -apple-system, "Segoe UI", sans-serif;
+  }
+  body { margin: 0; background: var(--fondo-pagina); color: var(--tinta); font-family: var(--fuente); }
+  main { max-width: 1160px; margin: 0 auto; padding: 32px 20px 48px; }
+  h1 { font-size: 28px; margin: 0 0 6px; }
+  .sub { color: var(--tinta-2); margin: 0 0 20px; }
+  .filtros { display: flex; flex-wrap: wrap; gap: 12px; align-items: end; margin-bottom: 20px; }
+  .filtros label { display: flex; flex-direction: column; gap: 4px; font-size: 13px; color: var(--tinta-2); }
+  .filtros select, .filtros button {
+    font: inherit; font-size: 14px; padding: 8px 10px; border-radius: 8px;
+    border: 1px solid var(--borde); background: var(--fondo); color: var(--tinta); min-width: 220px;
+  }
+  .filtros button { min-width: 0; cursor: pointer; color: var(--tinta-2); }
+  .filtros button:hover { background: #f0efec; }
+  .contexto { font-size: 14px; color: var(--tinta-2); margin: 0 0 16px; }
+  .kpis { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 12px; margin-bottom: 20px; }
+  .kpi, .panel { background: var(--fondo); border: 1px solid var(--borde); border-radius: 12px; }
+  .kpi { padding: 16px 18px; display: flex; flex-direction: column; gap: 6px; }
+  .kpi-etiqueta { color: var(--tinta-2); font-size: 14px; }
+  .kpi-valor { font-size: 28px; font-weight: 600; }
+  .grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 16px; }
+  .panel { padding: 12px; min-width: 0; overflow: hidden; }
+  .panel h2 { font-size: 16px; font-weight: 600; margin: 4px 6px 0; }
+  .panel .ayuda { font-size: 13px; color: var(--tinta-2); margin: 4px 6px 0; }
+  .ancho { grid-column: 1 / -1; }
+  .grafica { width: 100%; height: 340px; }
+  .grafica.alta { height: 460px; }
+  .vacio { padding: 40px 10px; text-align: center; color: var(--tinta-tenue); }
+  .nota { color: var(--tinta-2); font-size: 14px; line-height: 1.5; margin-top: 24px; }
+  details { margin-top: 16px; }
+  .tabla { border-collapse: collapse; width: 100%; font-size: 14px; margin-top: 8px; }
+  .tabla th, .tabla td { text-align: right; padding: 6px 10px; border-bottom: 1px solid var(--grilla); }
+  .tabla th:first-child, .tabla td:first-child { text-align: left; }
+  @media (max-width: 760px) { .grid { grid-template-columns: 1fr; } .filtros select { min-width: 0; width: 100%; } .filtros label { flex: 1 1 100%; } }
+</style>
+</head>
+<body>
+<main>
+  <h1>Contratación pública en Colombia</h1>
+  <p class="sub" id="subtitulo"></p>
+
+  <section class="filtros">
+    <label>Departamento <select id="f-depto"></select></label>
+    <label>Tipo de contrato <select id="f-tipo"></select></label>
+    <button id="limpiar" type="button">Quitar filtros</button>
+  </section>
+  <p class="contexto" id="contexto"></p>
+
+  <section class="kpis" id="kpis"></section>
+
+  <section class="grid">
+    <div class="panel"><h2>Contratos firmados por mes</h2><div class="grafica" id="g-contratos"></div></div>
+    <div class="panel"><h2>Valor contratado por mes (miles de millones de pesos)</h2><div class="grafica" id="g-valor"></div></div>
+    <div class="panel"><h2>Contratos por contratación directa (% del mes)</h2><div class="grafica" id="g-directa"></div></div>
+    <div class="panel"><h2>Contratos con personas naturales (% del mes)</h2><div class="grafica" id="g-natural"></div></div>
+    <div class="panel">
+      <h2>Contratación directa por departamento</h2>
+      <p class="ayuda">Haz clic en un departamento para filtrar el tablero. En gris, los que tienen menos de <span id="min-mapa"></span> contratos.</p>
+      <div class="grafica alta" id="g-mapa"></div>
+    </div>
+    <div class="panel"><h2>Las 10 entidades con mayor valor contratado</h2><div class="grafica alta" id="g-entidades"></div></div>
+    <div class="panel ancho"><h2>Valor contratado por modalidad</h2><div class="grafica" id="g-modalidad"></div></div>
+  </section>
+
+  <details>
+    <summary>Ver datos mensuales en tabla</summary>
+    <div id="tabla"></div>
+  </details>
+
+  <p class="nota">
+    Fuente: <a href="https://www.datos.gov.co/Gastos-Gubernamentales/SECOP-II-Contratos-Electr-nicos/jbjy-vk9h">SECOP II – Contratos Electrónicos</a>, datos.gov.co.
+    Mapa: DANE, Marco Geoestadístico Nacional (vía geo-colombia, licencia MIT). San Andrés y Providencia no se dibuja por escala, pero está en el filtro.
+    La franja gris marca la Ley de Garantías (31 de enero al 22 de junio de 2026), que prohibió la contratación directa antes de las elecciones presidenciales.
+    La barra más clara es el mes en curso, todavía incompleto. Los contratos se publican con días o semanas de retraso.
+  </p>
+</main>
+
+<script type="application/json" id="datos">__DATOS__</script>
+<script type="application/json" id="geo">__GEO__</script>
+<script>
+// ---------------------------------------------------------------- Datos
+const D = JSON.parse(document.getElementById("datos").textContent);
+const GEO = JSON.parse(document.getElementById("geo").textContent);
+const [M, DEP, TIPO, MOD, N, V, ND, NN, NP] = [0, 1, 2, 3, 4, 5, 6, 7, 8];   // columnas de D.filas
+const estado = { depto: -1, tipo: -1 };   // -1 = todos
+
+const css = getComputedStyle(document.documentElement);
+const C = name => css.getPropertyValue(name).trim();
+const COLOR = { azul: C("--azul"), azulClaro: C("--azul-claro"), tinta: C("--tinta"), tinta2: C("--tinta-2"),
+                tenue: C("--tinta-tenue"), grilla: C("--grilla"), fondo: C("--fondo"), sombreado: C("--sombreado") };
+const FUENTE = C("--fuente");
+const MESES_ES = ["ene","feb","mar","abr","may","jun","jul","ago","sep","oct","nov","dic"];
+
+// ---------------------------------------------------------------- Formato (es-CO)
+const fmtEntero = new Intl.NumberFormat("es-CO", { maximumFractionDigits: 0 });
+const fmt1 = new Intl.NumberFormat("es-CO", { minimumFractionDigits: 1, maximumFractionDigits: 1 });
+const fmt2 = new Intl.NumberFormat("es-CO", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+const pesos = v => v >= 1e12 ? `$${fmt2.format(v / 1e12)} billones` : `$${fmt1.format(v / 1e9)} mil millones`;
+const pct = x => isFinite(x) ? `${fmt1.format(x * 100)}%` : "–";
+const etiquetaMes = m => { const [a, n] = m.split("-"); return `${MESES_ES[+n - 1]}<br>${a.slice(2)}`; };
+const etiquetaMesPlana = m => etiquetaMes(m).replace("<br>", " ");
+const etiquetas = D.meses.map(etiquetaMes);
+
+// ---------------------------------------------------------------- Agregaciones
+const filtrar = (porDepto = true) => D.filas.filter(f =>
+  (!porDepto || estado.depto < 0 || f[DEP] === estado.depto) && (estado.tipo < 0 || f[TIPO] === estado.tipo));
+
+function sumarPor(filas, col, tamano) {
+  const acc = Array.from({ length: tamano }, () => ({ n: 0, v: 0, nd: 0, nn: 0, np: 0 }));
+  for (const f of filas) { const a = acc[f[col]]; a.n += f[N]; a.v += f[V]; a.nd += f[ND]; a.nn += f[NN]; a.np += f[NP]; }
+  return acc;
+}
+const total = filas => sumarPor(filas.map(f => [0, ...f.slice(1)]), 0, 1)[0];
+
+// ---------------------------------------------------------------- Estilo común
+const CONFIG = { displayModeBar: false, responsive: true };
+function layoutBase(extra = {}) {
+  return Object.assign({
+    font: { family: FUENTE, size: 13, color: COLOR.tinta2 },
+    paper_bgcolor: COLOR.fondo, plot_bgcolor: COLOR.fondo,
+    margin: { l: 56, r: 16, t: 16, b: 44 }, separators: ",.", showlegend: false,
+    hoverlabel: { bgcolor: "white", font: { family: FUENTE, color: COLOR.tinta } }, bargap: 0.35,
+    xaxis: { type: "category", tickangle: 0, tickfont: { color: COLOR.tenue }, linecolor: "#c3c2b7", showgrid: false, fixedrange: true },
+    yaxis: { tickfont: { color: COLOR.tenue }, gridcolor: COLOR.grilla, zeroline: false, fixedrange: true },
+  }, extra);
+}
+
+// Franja de la Ley de Garantías sobre un eje de categorías (meses)
+function sombreadoGarantias() {
+  const lg = D.ley_garantias;
+  const dentro = D.meses.map((m, i) => (m >= lg.mes_desde && m <= lg.mes_hasta) ? i : -1).filter(i => i >= 0);
+  if (!dentro.length) return { shapes: [], annotations: [] };
+  const x0 = dentro[0] - 0.5, x1 = dentro[dentro.length - 1] + 0.5;
+  return {
+    shapes: [{ type: "rect", xref: "x", yref: "paper", x0, x1, y0: 0, y1: 1,
+               fillcolor: COLOR.sombreado, line: { width: 0 }, layer: "below" }],
+    annotations: [{ xref: "x", yref: "paper", x: (x0 + x1) / 2, y: 1, yanchor: "bottom", showarrow: false,
+                    text: "Ley de Garantías", font: { size: 11, color: COLOR.tenue } }],
+  };
+}
+
+function vacio(id, mensaje = "Sin datos para este filtro") {
+  Plotly.purge(id);
+  document.getElementById(id).innerHTML = `<div class="vacio">${mensaje}</div>`;
+}
+function limpiarVacio(id) { const el = document.getElementById(id); if (el.querySelector(".vacio")) el.innerHTML = ""; }
+
+// ---------------------------------------------------------------- Gráficas
+function barrasMensuales(id, valores, hover, extraY = {}) {
+  limpiarVacio(id);
+  const colores = D.meses.map(m => m === D.mes_en_curso ? COLOR.azulClaro : COLOR.azul);
+  const s = sombreadoGarantias();
+  Plotly.react(id, [{ type: "bar", x: etiquetas, y: valores, marker: { color: colores },
+                      hovertemplate: hover + "<extra></extra>" }],
+    layoutBase({ shapes: s.shapes, annotations: s.annotations, margin: { l: 56, r: 16, t: 22, b: 44 },
+                 yaxis: Object.assign(layoutBase().yaxis, extraY) }), CONFIG);
+}
+
+function lineaPorcentaje(id, valores, textoHover) {
+  limpiarVacio(id);
+  const s = sombreadoGarantias();
+  Plotly.react(id, [{ type: "scatter", mode: "lines+markers", x: etiquetas, y: valores, connectgaps: false,
+                      line: { color: COLOR.azul, width: 2 },
+                      marker: { size: 8, color: COLOR.azul, line: { color: COLOR.fondo, width: 2 } },
+                      hovertemplate: `%{x}<br>%{y:.1%} ${textoHover}<extra></extra>` }],
+    layoutBase({ shapes: s.shapes, annotations: s.annotations, margin: { l: 56, r: 16, t: 22, b: 44 },
+                 yaxis: Object.assign(layoutBase().yaxis, { tickformat: ".0%", range: [0, 1] }) }), CONFIG);
+}
+
+function barrasHorizontales(id, nombres, valores, contratos, margenIzq) {
+  if (!nombres.length) return vacio(id);
+  limpiarVacio(id);
+  const corto = nombres.map(n => n.length > 42 ? n.slice(0, 41) + "…" : n);
+  Plotly.react(id, [{ type: "bar", orientation: "h", x: valores.map(v => v / 1e9), y: corto,
+                      customdata: nombres.map((n, i) => [n, contratos[i]]), marker: { color: COLOR.azul },
+                      hovertemplate: "<b>%{customdata[0]}</b><br>Valor: $%{x:,.1f} mil millones<br>Contratos: %{customdata[1]:,}<extra></extra>" }],
+    layoutBase({
+      margin: { l: margenIzq, r: 16, t: 8, b: 48 },
+      xaxis: { tickfont: { color: COLOR.tenue }, gridcolor: COLOR.grilla, zeroline: false, fixedrange: true, tickformat: ",~f",
+               title: { text: "Miles de millones de pesos", font: { size: 12, color: COLOR.tenue } } },
+      yaxis: { type: "category", tickfont: { color: COLOR.tinta2 }, showgrid: false, fixedrange: true, automargin: true },
+    }), CONFIG);
+}
+
+// El mapa se dibuja con polígonos en un plano cartesiano (proyección Mercator hecha aquí).
+// Así no depende de descargar mapas base externos y funciona igual en Databricks y en la web.
+const mercator = lat => 180 / Math.PI * Math.log(Math.tan(Math.PI / 4 + lat * Math.PI / 360));
+const FORMAS = GEO.features
+  .filter(f => f.properties[D.campo_codigo] !== "88")          // San Andrés: fuera por escala
+  .map(f => {
+    const poligonos = f.geometry.type === "Polygon" ? [f.geometry.coordinates] : f.geometry.coordinates;
+    const x = [], y = [];
+    for (const pol of poligonos) {                             // solo el anillo exterior de cada polígono
+      for (const [lon, lat] of pol[0]) { x.push(lon); y.push(mercator(lat)); }
+      x.push(null); y.push(null);
+    }
+    return { codigo: f.properties[D.campo_codigo], x, y };
+  });
+const ESCALA = ["#cde2fb", "#3987e5", "#0d366b"];             // un solo tono, de claro a oscuro
+function colorEnEscala(t) {
+  const hex = h => [1, 3, 5].map(i => parseInt(h.slice(i, i + 2), 16));
+  const tramo = Math.min(Math.max(t, 0), 1) * (ESCALA.length - 1);
+  const i = Math.min(Math.floor(tramo), ESCALA.length - 2), f = tramo - i;
+  const [a, b] = [hex(ESCALA[i]), hex(ESCALA[i + 1])];
+  return `rgb(${a.map((v, k) => Math.round(v + (b[k] - v) * f)).join(",")})`;
+}
+
+function mapa() {
+  // El mapa ignora el filtro de departamento (muestra todos), pero respeta el tipo de contrato
+  const porDepto = sumarPor(filtrar(false), DEP, D.deptos.length);
+  const porCodigo = {};
+  porDepto.forEach((a, i) => { if (D.codigos[i]) porCodigo[D.codigos[i]] = { ...a, i }; });
+  const valores = Object.values(porCodigo).filter(a => a.n >= D.min_contratos_mapa).map(a => a.nd / a.n);
+  const zmin = valores.length ? Math.min(...valores) : 0;
+  const zmax = valores.length && Math.max(...valores) > zmin ? Math.max(...valores) : zmin + 0.01;
+
+  const trazas = FORMAS.map(forma => {
+    const a = porCodigo[forma.codigo];
+    const valido = a && a.n >= D.min_contratos_mapa;
+    const sel = a && a.i === estado.depto;
+    const nombre = a ? D.deptos[a.i] : forma.codigo;
+    return {
+      type: "scatter", mode: "lines", x: forma.x, y: forma.y, fill: "toself", hoveron: "fills",
+      fillcolor: valido ? colorEnEscala((a.nd / a.n - zmin) / (zmax - zmin)) : COLOR.grilla,
+      line: { color: sel ? COLOR.tinta : "white", width: sel ? 2.5 : 0.6 },
+      name: valido ? `<b>${nombre}</b><br>${pct(a.nd / a.n)} contratación directa<br>${fmtEntero.format(a.n)} contratos`
+                   : `<b>${nombre}</b><br>Menos de ${D.min_contratos_mapa} contratos`,
+      hoverinfo: "name", hoverlabel: { namelength: -1 },
+    };
+  });
+  // Traza invisible que solo dibuja la barra de colores
+  trazas.push({ type: "scatter", mode: "markers", x: [null], y: [null], hoverinfo: "skip",
+    marker: { color: [zmin, zmax], cmin: zmin, cmax: zmax, showscale: true,
+              colorscale: ESCALA.map((c, i) => [i / (ESCALA.length - 1), c]),
+              colorbar: { tickformat: ".0%", thickness: 10, len: 0.6, outlinewidth: 0, tickfont: { color: COLOR.tenue, size: 11 } } } });
+
+  Plotly.react("g-mapa", trazas, {
+    font: { family: FUENTE, size: 13, color: COLOR.tinta2 }, paper_bgcolor: COLOR.fondo, plot_bgcolor: COLOR.fondo,
+    margin: { l: 0, r: 0, t: 0, b: 0 }, showlegend: false, dragmode: false,
+    hoverlabel: { bgcolor: "white", font: { family: FUENTE, color: COLOR.tinta } },
+    xaxis: { visible: false, fixedrange: true },
+    yaxis: { visible: false, fixedrange: true, scaleanchor: "x", scaleratio: 1 },
+  }, CONFIG);
+}
+
+// ---------------------------------------------------------------- Render
+function render() {
+  const filas = filtrar();
+  const t = total(filas);
+  const nombreDepto = estado.depto < 0 ? "Colombia" : D.deptos[estado.depto];
+  const nombreTipo = estado.tipo < 0 ? "todos los tipos de contrato" : D.tipos[estado.tipo];
+  document.getElementById("contexto").textContent = `Mostrando: ${nombreDepto} · ${nombreTipo}`;
+
+  document.getElementById("kpis").innerHTML = [
+    ["Contratos", fmtEntero.format(t.n)], ["Valor total", pesos(t.v)],
+    ["Contratación directa", pct(t.nd / t.n)], ["Personas naturales", pct(t.nn / t.n)],
+  ].map(([e, v]) => `<div class="kpi"><span class="kpi-etiqueta">${e}</span><span class="kpi-valor">${v}</span></div>`).join("");
+
+  const mes = sumarPor(filas, M, D.meses.length);
+  const pctSeguro = (a, b) => b > 0 ? a / b : null;   // null = sin punto (no un 0% falso)
+  if (t.n === 0) {
+    ["g-contratos", "g-valor", "g-directa", "g-natural"].forEach(id => vacio(id));
+  } else {
+    barrasMensuales("g-contratos", mes.map(a => a.n), "%{x}<br>%{y:,} contratos", { tickformat: ",d" });
+    barrasMensuales("g-valor", mes.map(a => a.v / 1e9), "%{x}<br>$%{y:,.1f} mil millones");
+    lineaPorcentaje("g-directa", mes.map(a => pctSeguro(a.nd, a.n)), "de los contratos");
+    lineaPorcentaje("g-natural", mes.map(a => pctSeguro(a.nn, a.n)), "con personas naturales");
+  }
+
+  const ent = D.entidades[`${estado.depto}|${estado.tipo}`] || [];
+  const entOrden = [...ent].reverse();   // Plotly dibuja de abajo hacia arriba
+  barrasHorizontales("g-entidades", entOrden.map(e => e[0]), entOrden.map(e => e[2]), entOrden.map(e => e[1]), 260);
+
+  const mod = sumarPor(filas, MOD, D.modalidades.length)
+    .map((a, i) => ({ nombre: D.modalidades[i], ...a })).filter(a => a.n > 0).sort((a, b) => a.v - b.v);
+  barrasHorizontales("g-modalidad", mod.map(a => a.nombre), mod.map(a => a.v), mod.map(a => a.n), 260);
+
+  mapa();
+
+  document.getElementById("tabla").innerHTML =
+    `<table class="tabla"><thead><tr><th>Mes</th><th>Contratos</th><th>Valor total</th><th>% contratación directa</th><th>% personas naturales</th></tr></thead><tbody>` +
+    mes.map((a, i) => `<tr><td>${etiquetaMesPlana(D.meses[i])}</td><td>${fmtEntero.format(a.n)}</td><td>${pesos(a.v)}</td><td>${pct(a.nd / a.n)}</td><td>${pct(a.nn / a.n)}</td></tr>`).join("") +
+    `</tbody></table>`;
+}
+
+// ---------------------------------------------------------------- Filtros
+const selDepto = document.getElementById("f-depto"), selTipo = document.getElementById("f-tipo");
+selDepto.innerHTML = `<option value="-1">Colombia (todos)</option>` + D.deptos.map((d, i) => `<option value="${i}">${d}</option>`).join("");
+selTipo.innerHTML = `<option value="-1">Todos los tipos</option>` + D.tipos.map((t, i) => `<option value="${i}">${t}</option>`).join("");
+selDepto.addEventListener("change", () => { estado.depto = +selDepto.value; render(); });
+selTipo.addEventListener("change", () => { estado.tipo = +selTipo.value; render(); });
+document.getElementById("limpiar").addEventListener("click", () => {
+  estado.depto = -1; estado.tipo = -1; selDepto.value = "-1"; selTipo.value = "-1"; render();
+});
+
+document.getElementById("subtitulo").textContent =
+  `Contratos firmados en SECOP II entre ${etiquetaMesPlana(D.meses[0])} y ${etiquetaMesPlana(D.meses[D.meses.length - 1])} · Actualizado: ${D.actualizado}`;
+document.getElementById("min-mapa").textContent = D.min_contratos_mapa;
+
+render();
+
+// Clic en el mapa: filtra por ese departamento (otro clic en el mismo lo quita)
+document.getElementById("g-mapa").on("plotly_click", ev => {
+  const p = ev.points && ev.points[0];
+  if (!p || p.curveNumber >= FORMAS.length) return;
+  const i = D.codigos.indexOf(FORMAS[p.curveNumber].codigo);
+  if (i < 0) return;
+  estado.depto = (estado.depto === i) ? -1 : i;
+  selDepto.value = String(estado.depto);
+  render();
+});
+</script>
+</body>
+</html>

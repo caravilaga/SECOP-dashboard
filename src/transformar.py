@@ -42,6 +42,7 @@ def limpiar(df: pd.DataFrame, hoy: date | None = None) -> pd.DataFrame:
     df["es_contratacion_directa"] = df["modalidad_de_contratacion"].str.contains(
         "directa", case=False, na=False)
     df["mes_firma"] = df["fecha_de_firma"].dt.to_period("M").astype(str)
+    df["es_persona_natural"] = ~df["tipodocproveedor"].astype("string").str.upper().str.contains("NIT", na=True)
     
 
     # 4. Reglas de validez

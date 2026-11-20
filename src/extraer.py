@@ -15,16 +15,23 @@ COLUMNAS = [
     "modalidad_de_contratacion", "proveedor_adjudicado", "es_pyme",
     "valor_del_contrato", "valor_pagado", "origen_de_los_recursos",
     "fecha_de_firma", "fecha_de_inicio_del_contrato", "fecha_de_fin_del_contrato",
-    "objeto_del_contrato", "urlproceso",
-    ]
+    "objeto_del_contrato", "urlproceso","ultima_actualizacion","g_nero_representante_legal","dias_adicionados",
+    "tipodocproveedor"]
 
 
-def construir_filtro(departamento: str, desde: date, hasta: date) -> str:
+# def construir_filtro(departamento: str, desde: date, hasta: date) -> str:
+#     """Arma la cláusula $where de SoQL para un departamento y rango de fechas."""
+#     departamento = departamento.replace("'", "''")  # escapa comillas simples
+#     return (
+#         f"departamento = '{departamento}' "
+#         f"AND fecha_de_firma >= '{desde.isoformat()}T00:00:00' "
+#         f"AND fecha_de_firma <= '{hasta.isoformat()}T23:59:59'"
+#     )
+
+def construir_filtro(desde: date, hasta: date) -> str:
     """Arma la cláusula $where de SoQL para un departamento y rango de fechas."""
-    departamento = departamento.replace("'", "''")  # escapa comillas simples
     return (
-        f"departamento = '{departamento}' "
-        f"AND fecha_de_firma >= '{desde.isoformat()}T00:00:00' "
+        f"fecha_de_firma >= '{desde.isoformat()}T00:00:00' "
         f"AND fecha_de_firma <= '{hasta.isoformat()}T23:59:59'"
     )
 
@@ -49,12 +56,14 @@ def _pedir_pagina(params: dict, intentos: int = 3) -> list:
             time.sleep(espera)
 
 
-def descargar_contratos(departamento: str, dias_atras: int = 30,
+# def descargar_contratos(departamento: str, dias_atras: int = 30,
+def descargar_contratos(dias_atras: int = 30,
                         hoy: date | None = None) -> pd.DataFrame:
     """Descarga los contratos firmados en los últimos `dias_atras` días."""
     hoy = hoy or date.today()
     desde = hoy - timedelta(days=dias_atras)
-    filtro = construir_filtro(departamento, desde, hoy)
+    # filtro = construir_filtro(departamento, desde, hoy)
+    filtro = construir_filtro(desde, hoy)
 
     paginas, offset = [], 0
     while True:
@@ -65,6 +74,7 @@ def descargar_contratos(departamento: str, dias_atras: int = 30,
             "$limit": TAMANO_PAGINA,
             "$offset": offset,
         }
+
         filas = _pedir_pagina(params)
         if not filas:
             break
@@ -76,7 +86,9 @@ def descargar_contratos(departamento: str, dias_atras: int = 30,
 
     if not paginas:
         return pd.DataFrame(columns=COLUMNAS)
+        # return pd.DataFrame()
 
     df = pd.concat(paginas, ignore_index=True)
     df = df.reindex(columns=COLUMNAS)  # asegura todas las columnas aunque vengan vacías
+    # df = df.reindex()  # asegura todas las columnas aunque vengan vacías
     return df.drop_duplicates(subset="id_contrato", keep="last")
