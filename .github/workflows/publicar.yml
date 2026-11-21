@@ -4,9 +4,12 @@ on:
   workflow_dispatch:            # botón manual "Run workflow"
   push:
     branches: [main]
-    paths:                      # solo cuando cambia algo que afecta la página
-      - "data/gold/**"
+    paths:
+      - "data/agregados/**"
+      - "data/geo/**"
       - "src/visualizar.py"
+      - "src/plantilla_tablero.html"
+      - "src/geo.py"
       - "requirements.txt"
 
 permissions:
