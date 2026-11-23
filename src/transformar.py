@@ -35,22 +35,24 @@ def limpiar(df: pd.DataFrame, hoy: date | None = None) -> pd.DataFrame:
         df[col] = normalizar_texto(df[col])
     df["sector"] = df["sector"].replace(REEMPLAZOS_SECTOR)
     df["es_pyme"] = df["es_pyme"].astype("string").str.strip().str.lower().isin(["si", "sí"])
-    df['duracion_dias'] = (df['fecha_de_fin_del_contrato'] - df['fecha_de_inicio_del_contrato']).dt.days
-    
 
     # 3. Columnas derivadas
     df["es_contratacion_directa"] = df["modalidad_de_contratacion"].str.contains(
         "directa", case=False, na=False)
+    df["es_persona_natural"] = ~df["tipodocproveedor"].astype("string").str.upper().str.contains(
+        "NIT", na=True)
     df["mes_firma"] = df["fecha_de_firma"].dt.to_period("M").astype(str)
-    df["es_persona_natural"] = ~df["tipodocproveedor"].astype("string").str.upper().str.contains("NIT", na=True)
-    
+    df["duracion_dias"] = (
+        df["fecha_de_fin_del_contrato"] - df["fecha_de_inicio_del_contrato"]
+    ).dt.days
+    df.loc[df["duracion_dias"] < 0, "duracion_dias"] = pd.NA
 
     # 4. Reglas de validez
     valido = (
         df["fecha_de_firma"].notna()
-        & (df["fecha_de_firma"] < hoy + pd.Timedelta(days=1))   # sin fechas futuras
+        & (df["fecha_de_firma"] < hoy + pd.Timedelta(days=1))
         & df["valor_del_contrato"].notna()
-        & (df["valor_del_contrato"] >= 0)                        # sin valores negativos
+        & (df["valor_del_contrato"] >= 0)
     )
     descartados = int((~valido).sum())
     if descartados:
