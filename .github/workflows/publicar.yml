@@ -1,23 +1,24 @@
 name: Publicar tablero
 
 on:
-  workflow_dispatch:            # botón manual "Run workflow"
+  workflow_dispatch:            # botón manual y disparo desde "Actualizar datos"
   push:
     branches: [main]
-    paths:
+    paths:                      # solo cuando cambia algo que afecta la página
       - "data/agregados/**"
       - "data/geo/**"
       - "src/visualizar.py"
       - "src/plantilla_tablero.html"
       - "src/geo.py"
+      - "src/agregar.py"
       - "requirements.txt"
 
 permissions:
-  contents: read                # leer el repo
-  pages: write                  # publicar en Pages
-  id-token: write               # identificarse ante Pages de forma segura
+  contents: read
+  pages: write
+  id-token: write
 
-concurrency:                    # evita dos publicaciones al mismo tiempo
+concurrency:
   group: pages
   cancel-in-progress: false
 
@@ -35,7 +36,10 @@ jobs:
           cache: pip
 
       - name: Instalar dependencias
-        run: pip install -r requirements.txt
+        run: pip install -r requirements.txt pytest
+
+      - name: Correr las pruebas         # CD: si una prueba falla, no se publica
+        run: pytest -q
 
       - name: Generar la página
         run: python -m src.visualizar
@@ -49,7 +53,7 @@ jobs:
           path: site
 
   publicar:
-    needs: construir            # espera a que termine "construir"
+    needs: construir
     runs-on: ubuntu-latest
     environment:
       name: github-pages

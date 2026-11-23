@@ -1,0 +1,60 @@
+name: Actualizar datos
+
+on:
+  schedule:
+    - cron: "17 11 * * 1"       # lunes 11:17 UTC = 6:17 a. m. en Colombia
+  workflow_dispatch:            # botón manual "Run workflow"
+
+permissions:
+  contents: write               # hacer commit de los datos nuevos
+  actions: write                # disparar el workflow de publicación
+
+concurrency:                    # nunca dos actualizaciones al mismo tiempo
+  group: actualizar-datos
+  cancel-in-progress: false
+
+jobs:
+  actualizar:
+    runs-on: ubuntu-latest
+    timeout-minutes: 90
+    steps:
+      - name: Descargar el repositorio
+        uses: actions/checkout@v5
+
+      - name: Instalar Python
+        uses: actions/setup-python@v6
+        with:
+          python-version: "3.12"
+          cache: pip
+
+      - name: Instalar dependencias
+        run: pip install -r requirements.txt pytest
+
+      - name: Correr las pruebas
+        run: pytest -q
+
+      - name: Correr el pipeline
+        run: python -m src.pipeline
+        env:
+          SOCRATA_APP_TOKEN: ${{ secrets.SOCRATA_APP_TOKEN }}
+
+      - name: Guardar los datos nuevos en el repo
+        id: guardar
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add data/agregados
+          if git diff --cached --quiet; then
+            echo "No hubo cambios en los datos."
+            echo "hubo_cambios=false" >> "$GITHUB_OUTPUT"
+          else
+            git commit -m "Datos: actualización semanal $(date -u +%Y-%m-%d)"
+            git push
+            echo "hubo_cambios=true" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Republicar el tablero
+        if: steps.guardar.outputs.hubo_cambios == 'true'
+        run: gh workflow run publicar.yml --ref main
+        env:
+          GH_TOKEN: ${{ github.token }}
