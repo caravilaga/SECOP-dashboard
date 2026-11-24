@@ -31,24 +31,41 @@ def construir_filtro(departamento: str | None, desde: date, hasta: date) -> str:
     return " AND ".join(condiciones)
 
 
+ENCABEZADOS = {
+    # Identificarse es una buena práctica con APIs públicas (y evita algunos bloqueos)
+    "User-Agent": "secop-dashboard/1.0 (+https://github.com/caravilaga/SECOP-dashboard)",
+    "Accept": "application/json",
+}
+
+
 def _pedir_pagina(params: dict, intentos: int = 3) -> list:
-    """Hace una petición a la API con reintentos si falla la red."""
-    headers = {}
-    token = os.getenv("SOCRATA_APP_TOKEN")
+    """Hace una petición a la API. Reintenta solo los errores que pueden ser temporales."""
+    headers = dict(ENCABEZADOS)
+    token = os.getenv("SOCRATA_APP_TOKEN", "").strip()
     if token:
         headers["X-App-Token"] = token
 
     for intento in range(1, intentos + 1):
         try:
             resp = requests.get(URL, params=params, headers=headers, timeout=(10, 60))
-            resp.raise_for_status()
-            return resp.json()
-        except requests.RequestException as error:
+        except requests.RequestException as error:      # red caída, timeout...
             if intento == intentos:
                 raise
-            espera = 5 * intento
-            print(f"Intento {intento} falló ({error}). Reintento en {espera}s...")
-            time.sleep(espera)
+            print(f"Intento {intento} falló ({error}). Reintento en {5 * intento}s...")
+            time.sleep(5 * intento)
+            continue
+
+        if resp.ok:
+            return resp.json()
+
+        detalle = resp.text[:300].replace("\n", " ")    # lo que respondió el servidor
+        temporal = resp.status_code == 429 or resp.status_code >= 500
+        if not temporal or intento == intentos:
+            raise requests.HTTPError(
+                f"{resp.status_code} {resp.reason}. Token enviado: {'sí' if token else 'no'}. "
+                f"Respuesta del servidor: {detalle}", response=resp)
+        print(f"Intento {intento}: {resp.status_code} (temporal). Reintento en {5 * intento}s...")
+        time.sleep(5 * intento)
 
 
 def descargar_contratos(departamento: str | None = None, dias_atras: int = 30,
